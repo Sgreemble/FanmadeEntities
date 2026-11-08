@@ -1,0 +1,139 @@
+--// UNLEASHED HELL
+--// DARKNESS
+--// Modified By Sgreemble!
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Spawner = loadstring(game:HttpGet(
+"https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"
+))()
+
+local Player = Players.LocalPlayer
+
+local MyEntity = Spawner:Create({
+Entity = {
+Name = "Darkness",
+Asset = "https://files.catbox.moe/nkmo0z.rbxm",
+HeightOffset = 2
+},
+
+Movement = {  
+    Speed = 15,  
+    Delay = 4,  
+    Reversed = false  
+},  
+
+Damage = {  
+    Enabled = true,  
+    IgnoreHiding = false,  
+    Range = 40,  
+    Amount = 11.4  
+},  
+
+Rebounding = {  
+    Enabled = false,  
+    Type = "Ambush",  
+    Min = 1,  
+    Max = 1,  
+    Delay = 5  
+},  
+
+Lights = {  
+    Flicker = {  
+        Enabled = true,  
+        Duration = 2  
+    },  
+    Shatter = true,  
+    Repair = false  
+},  
+
+Earthquake = {  
+    Enabled = true  
+},  
+
+CameraShake = {  
+    Enabled = false,  
+    Values = {3, 15, 0.2, 1},  
+    Range = 100  
+},  
+
+Crucifixion = {  
+    Type = "Guiding",  
+    Enabled = true,  
+    Range = 40,  
+    Resist = true,  
+    Break = false  
+},  
+
+Death = {  
+    Type = "Guiding",  
+    Hints = {  
+        "Really?",  
+        "Of all of this hell you died to, darkness?",  
+        "Anyway.",  
+        "It destroys every light that it can.",  
+        "But I don't know how someone dies to that.",  
+        "I was expecting Screech to kill you.",  
+        "Maybe you should watch your health.",  
+        "And maybe don't stand in the dark.",  
+        "Darkness itself isn't the problem.",  
+        "It's what comes after.",  
+        "You know what I mean.",  
+        "Don't.",  
+        "Give.",  
+        "Up."  
+    },  
+    Cause = "Darkness"  
+}
+
+})
+
+--// DARKNESS ALWAYS LOOKS AT THE PLAYER
+MyEntity:SetCallback("OnSpawned", function()
+task.spawn(function()
+while MyEntity:IsAlive() do
+local Character = Player.Character
+local Root = Character and (
+Character:FindFirstChild("HumanoidRootPart")
+or Character.PrimaryPart
+)
+
+local Model = MyEntity.Model  
+
+        if Root and Model and Model.Parent then  
+            local Position = Model:GetPivot().Position  
+
+            Model:PivotTo(  
+                CFrame.lookAt(Position, Root.Position)  
+            )  
+        end  
+
+        RunService.RenderStepped:Wait()  
+    end  
+end)
+
+end)
+
+MyEntity:SetCallback("OnStartMoving", function()
+print("Darkness has started moving.")
+end)
+
+MyEntity:SetCallback("OnEnterRoom", function(room, firstTime)
+if firstTime then
+print("Darkness entered: "..room.Name)
+end
+end)
+
+MyEntity:SetCallback("OnDamagePlayer", function(newHealth)
+if newHealth <= 0 then
+print("Darkness killed the player.")
+end
+end)
+
+MyEntity:SetCallback("OnDespawning", function()
+print("Darkness is despawning.")
+end)
+
+--// SPAWN DARKNESS
+MyEntity:Run(true)
