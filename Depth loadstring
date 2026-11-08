@@ -1,0 +1,497 @@
+--[[
+DOORS — DEPTH REIMAGINED
+BETA 2 — FACE + ANIMATED STATIC + CRUCIFIXION AUDIO
+Made By Sgreemble!
+]]
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
+
+local Player = Players.LocalPlayer
+local RNG = Random.new()
+
+local SPAWNER_URL = "https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"
+local DEPTH_URL = "https://raw.githubusercontent.com/Sgreemble/FanmadeEntities/main/DepthReimagined.rbxm"
+
+local SPAWN_SOUND_ID = "rbxassetid://138175227296034"
+local CRUCIFIX_SOUND_ID = "rbxassetid://138776356539253"
+
+local FACE_ID = "rbxassetid://123822082171984"
+local STATIC_FRAMES = {
+"rbxassetid://110138270253539",
+"rbxassetid://127877455604881",
+"rbxassetid://127584184236055"
+}
+
+local SPEED = 321
+local MAX_FACE_DISTANCE = 120
+local FULL_FACE_DISTANCE = 18
+local STATIC_INTERVAL = 0.1
+
+if _G.DEPTH_BETA2_STOP then
+pcall(_G.DEPTH_BETA2_STOP)
+end
+
+local alive = true
+local connections = {}
+local Entity
+local Model
+local ScreenGui
+local Face
+local Static
+local CyanEffect
+local CrucifixSound
+local SpawnSound
+local CrucifixStarted = false
+local StaticIndex = 1
+local LastStaticChange = 0
+
+local function disconnectAll()
+for _, connection in ipairs(connections) do
+pcall(function()
+connection:Disconnect()
+end)
+end
+table.clear(connections)
+end
+
+local function cleanupVisuals()
+if ScreenGui then
+pcall(function() ScreenGui:Destroy() end)
+ScreenGui = nil
+end
+
+if CyanEffect then  
+    pcall(function() CyanEffect:Destroy() end)  
+    CyanEffect = nil  
+end
+
+end
+
+local function stop()
+if not alive then return end
+alive = false
+
+disconnectAll()  
+cleanupVisuals()  
+
+for _, sound in ipairs({SpawnSound, CrucifixSound}) do  
+    if sound then  
+        pcall(function() sound:Stop() end)  
+    end  
+end  
+
+if Entity then  
+    pcall(function() Entity:Despawn() end)  
+    Entity = nil  
+end  
+
+Model = nil
+
+end
+
+_G.DEPTH_BETA2_STOP = stop
+
+local function createSpawnEffects()
+if not alive then return end
+
+-- Cyan screen flash  
+if CyanEffect then  
+    pcall(function() CyanEffect:Destroy() end)  
+end  
+
+CyanEffect = Instance.new("ColorCorrectionEffect")  
+CyanEffect.Name = "DepthBeta2Cyan"  
+CyanEffect.TintColor = Color3.new(1, 1, 1)  
+CyanEffect.Contrast = 0  
+CyanEffect.Saturation = 0  
+CyanEffect.Brightness = 0  
+CyanEffect.Parent = Lighting  
+
+local fadeIn = TweenService:Create(  
+    CyanEffect,  
+    TweenInfo.new(0.65),  
+    {  
+        TintColor = Color3.fromRGB(0, 255, 255),  
+        Contrast = 0.15,  
+        Saturation = -0.1  
+    }  
+)  
+fadeIn:Play()  
+
+task.spawn(function()  
+    task.wait(0.35)  
+    if not alive or not CyanEffect then return end  
+
+    local effect = CyanEffect  
+    local fadeOut = TweenService:Create(  
+        effect,  
+        TweenInfo.new(1.1),  
+        {  
+            TintColor = Color3.new(1, 1, 1),  
+            Contrast = 0,  
+            Saturation = 0,  
+            Brightness = 0  
+        }  
+    )  
+
+    fadeOut:Play()  
+    fadeOut.Completed:Wait()  
+
+    if CyanEffect == effect then  
+        effect:Destroy()  
+        CyanEffect = nil  
+    end  
+end)  
+
+-- Spawn sound  
+SpawnSound = Instance.new("Sound")  
+SpawnSound.Name = "DepthSpawnSound"  
+SpawnSound.SoundId = SPAWN_SOUND_ID  
+SpawnSound.Volume = 1  
+SpawnSound.Parent = SoundService  
+SpawnSound:Play()  
+Debris:AddItem(SpawnSound, 15)
+
+end
+
+local function createFaceGui()
+if not alive or ScreenGui then return end
+
+local playerGui = Player:FindFirstChildOfClass("PlayerGui")  
+if not playerGui then  
+    playerGui = Player:WaitForChild("PlayerGui", 5)  
+end  
+if not playerGui or not alive then return end  
+
+ScreenGui = Instance.new("ScreenGui")  
+ScreenGui.Name = "DepthFaceEffect"  
+ScreenGui.IgnoreGuiInset = true  
+ScreenGui.ResetOnSpawn = false  
+ScreenGui.DisplayOrder = 100  
+ScreenGui.Parent = playerGui  
+
+-- Full-screen animated static  
+Static = Instance.new("ImageLabel")  
+Static.Name = "DepthStatic"  
+Static.AnchorPoint = Vector2.zero  
+Static.Position = UDim2.fromScale(0, 0)  
+Static.Size = UDim2.fromScale(1, 1)  
+Static.BackgroundTransparency = 1  
+Static.BorderSizePixel = 0  
+Static.Image = STATIC_FRAMES[1]  
+Static.ImageTransparency = 1  
+Static.ScaleType = Enum.ScaleType.Stretch  
+Static.ZIndex = 1  
+Static.Parent = ScreenGui  
+
+-- Smaller Depth face  
+Face = Instance.new("ImageLabel")  
+Face.Name = "DepthFace"  
+Face.AnchorPoint = Vector2.new(0.5, 0.5)  
+Face.Position = UDim2.fromScale(0.5, 0.5)  
+Face.Size = UDim2.fromScale(0.25, 0.35)  
+Face.BackgroundTransparency = 1  
+Face.BorderSizePixel = 0  
+Face.Image = FACE_ID  
+Face.ImageTransparency = 1  
+Face.ScaleType = Enum.ScaleType.Fit  
+Face.ZIndex = 2  
+Face.Parent = ScreenGui
+
+end
+
+local function findRushNew(model)
+-- Search ONLY inside Depth's model.
+for _, object in ipairs(model:GetDescendants()) do
+if object.Name == "RushNew" and object:IsA("BasePart") then
+return object
+end
+end
+return nil
+end
+
+local function playCrucifixSound(model)
+if CrucifixStarted or not alive then return end
+CrucifixStarted = true
+
+-- Hide the face and static immediately.  
+if Face then Face.ImageTransparency = 1 end  
+if Static then Static.ImageTransparency = 1 end  
+
+local rushNew = findRushNew(model)  
+if not rushNew then  
+    warn("[DEPTH] RushNew was not found inside Depth's model.")  
+    return  
+end  
+
+-- Reuse the matching sound if it already exists inside RushNew.  
+local sound  
+for _, object in ipairs(rushNew:GetDescendants()) do  
+    if object:IsA("Sound") and object.SoundId == CRUCIFIX_SOUND_ID then  
+        sound = object  
+        break  
+    end  
+end  
+
+if not sound then  
+    sound = Instance.new("Sound")  
+    sound.Name = "DepthCrucifixSound"  
+    sound.SoundId = CRUCIFIX_SOUND_ID  
+    sound.Parent = rushNew  
+end  
+
+sound.Volume = 3  
+CrucifixSound = sound  
+
+pcall(function()  
+    sound:Play()  
+end)
+
+end
+
+local function updateFaceAndStatic()
+if not alive or not Model or not Model.Parent then
+if Face then Face.ImageTransparency = 1 end
+if Static then Static.ImageTransparency = 1 end
+return
+end
+
+if not Face or not Static then return end  
+
+-- Crucifixion: hide effects immediately.  
+if Model:GetAttribute("BeingBanished") then  
+    if not CrucifixStarted then  
+        playCrucifixSound(Model)  
+    end  
+    Face.ImageTransparency = 1  
+    Static.ImageTransparency = 1  
+    return  
+elseif CrucifixStarted then  
+    -- Do not restart the sound or visual effect after banishment.  
+    Face.ImageTransparency = 1  
+    Static.ImageTransparency = 1  
+    return  
+end  
+
+local camera = workspace.CurrentCamera  
+if not camera then return end  
+
+local distance = (camera.CFrame.Position - Model:GetPivot().Position).Magnitude  
+
+if distance >= MAX_FACE_DISTANCE then  
+    Face.ImageTransparency = 1  
+    Static.ImageTransparency = 1  
+    return  
+end  
+
+local intensity = math.clamp(  
+    (MAX_FACE_DISTANCE - distance) /  
+    (MAX_FACE_DISTANCE - FULL_FACE_DISTANCE),  
+    0,  
+    1  
+)  
+
+-- Face fades in as Depth approaches.  
+Face.ImageTransparency = 1 - intensity  
+
+-- Static stays semi-transparent; maximum opacity is 0.4.  
+Static.ImageTransparency = 1 - (intensity * 0.6)  
+
+-- Animate the static using the three provided frames.  
+local now = os.clock()  
+if intensity > 0 and now - LastStaticChange >= STATIC_INTERVAL then  
+    LastStaticChange = now  
+    StaticIndex = (StaticIndex % #STATIC_FRAMES) + 1  
+    Static.Image = STATIC_FRAMES[StaticIndex]  
+end
+
+end
+
+local function loadSpawner()
+local ok, result = pcall(function()
+return loadstring(game:HttpGet(SPAWNER_URL))()
+end)
+
+if not ok or not result then  
+    warn("[DEPTH] Entity Spawner V2 failed to load:", result)  
+    return nil  
+end  
+
+return result
+
+end
+
+local Spawner = loadSpawner()
+if not Spawner then
+stop()
+return
+end
+
+local success, entity = pcall(function()
+return Spawner:Create({
+Entity = {
+Name = "Depth",
+Asset = DEPTH_URL,
+HeightOffset = 0
+},
+
+Lights = {  
+        Flicker = {  
+            Enabled = false,  
+            Duration = 1  
+        },  
+        Shatter = true,  
+        Repair = false  
+    },  
+
+    Earthquake = {  
+        Enabled = true  
+    },  
+
+    CameraShake = {  
+        Enabled = true,  
+        Range = 100,  
+        Values = {1.5, 20, 0.1, 1}  
+    },  
+
+    Movement = {  
+        Speed = SPEED,  
+        Delay = 2,  
+        Reversed = true  
+    },  
+
+    Rebounding = {  
+        Enabled = true,  
+        Type = "Ambush",  
+        Min = 2,  
+        Max = 7,  
+        Delay = 0.5  
+    },  
+
+    Damage = {  
+        Enabled = true,  
+        Range = 40,  
+        Amount = 99999  
+    },  
+
+    Crucifixion = {  
+        Enabled = true,  
+        Range = 40,  
+        Resist = false,  
+        Break = true  
+    },  
+
+    Death = {  
+        Type = "Guiding",  
+        Hints = {  
+            "So, you died to 'Depth'",  
+            "I was expecting that...",  
+            "He is very fast and you have almost no time to react to the incoming rebound",  
+            "Stay safe next time"  
+        },  
+        Cause = "Depth"  
+    }  
+})
+
+end)
+
+if not success or not entity then
+warn("[DEPTH] Entity creation failed:", entity)
+stop()
+return
+end
+
+Entity = entity
+Model = entity.Model
+
+if not Model or not Model:IsA("Model") then
+warn("[DEPTH] The spawner did not provide a valid entity model.")
+stop()
+return
+end
+
+entity:SetCallback("OnSpawned", function()
+if not alive then return end
+
+-- Ensure we use the actual spawned model.  
+Model = entity.Model or Model  
+
+createSpawnEffects()  
+createFaceGui()  
+
+print("[DEPTH] Spawned: cyan flash, spawn audio and face effect ready.")
+
+end)
+
+entity:SetCallback("OnStartMoving", function()
+if alive then
+print("[DEPTH] Started moving.")
+end
+end)
+
+entity:SetCallback("OnEnterRoom", function(room, firstTime)
+if alive then
+print("[DEPTH] Entered room:", room and room.Name, firstTime)
+end
+end)
+
+entity:SetCallback("OnLookAt", function(lineOfSight)
+if alive then
+-- Face visibility is handled by the distance watcher.
+end
+end)
+
+entity:SetCallback("OnRebounding", function(startOfRebound)
+if alive then
+print("[DEPTH] Rebound:", startOfRebound)
+end
+end)
+
+entity:SetCallback("OnDespawning", function()
+if Face then Face.ImageTransparency = 1 end
+if Static then Static.ImageTransparency = 1 end
+end)
+
+entity:SetCallback("OnDespawned", function()
+cleanupVisuals()
+end)
+
+entity:SetCallback("OnDamagePlayer", function(newHealth)
+if alive then
+print("[DEPTH] Player health:", newHealth)
+end
+end)
+
+-- Monitor proximity and crucifixion without replacing the spawner's
+-- built-in crucifixion behavior.
+table.insert(connections, RunService.Heartbeat:Connect(function()
+if not alive then return end
+
+if Model and Model.Parent then  
+    if Model:GetAttribute("BeingBanished") then  
+        if not CrucifixStarted then  
+            playCrucifixSound(Model)  
+        end  
+    end  
+
+    updateFaceAndStatic()  
+end
+
+end))
+
+-- Start the entity.
+local ran, runError = pcall(function()
+entity:Run(true)
+end)
+
+if not ran then
+warn("[DEPTH] Entity execution failed:", runError)
+end
+
+print("[DEPTH] BETA 2 initialized | Speed:", SPEED)
+print("[DEPTH] To stop: _G.DEPTH_BETA2_STOP()")
