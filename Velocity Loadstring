@@ -1,0 +1,244 @@
+--==================================================
+-- VELOCITY | ANTI-MECHANIC CONTAMINATION
+-- Made By Sgreemble!
+-- Beta 2
+--==================================================
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local ENTITY_NAME = "Velocity"
+
+local ASSET =
+    "https://raw.githubusercontent.com/Sgreemble/FanmadeEntities/main/Velocity.rbxm"
+
+local SPAWNER_URL =
+    "https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"
+
+local VELOCITY_KEY = "SGREEMBLE_VELOCITY_V1"
+
+local START_SPEED = 5
+local SPEED_INCREMENT = 5
+local SPEED_INTERVAL = 1
+
+--==================================================
+-- LOAD AND PATCH SPAWNER
+--==================================================
+
+local source = game:HttpGet(SPAWNER_URL)
+
+local oldMovement =
+    "model:PivotTo(pivot + unit * math.min(step * speed, magnitude))"
+
+local newMovement = [[
+                local currentSpeed = speed
+
+                if model.Name == "Velocity"
+                    and model:GetAttribute("VelocityDynamicEnabled") == true
+                    and model:GetAttribute("VelocityEntityKey") == "SGREEMBLE_VELOCITY_V1" then
+
+                    local dynamicSpeed = model:GetAttribute("VelocityDynamicSpeed")
+
+                    if typeof(dynamicSpeed) == "number" then
+                        currentSpeed = dynamicSpeed
+                    end
+                end
+
+                model:PivotTo(
+                    pivot + unit * math.min(step * currentSpeed, magnitude)
+                )
+]]
+
+local position = string.find(source, oldMovement, 1, true)
+
+if not position then
+    error("[VELOCITY] Could not patch EntityMoveTo!")
+end
+
+source =
+    string.sub(source, 1, position - 1)
+    .. newMovement
+    .. string.sub(source, position + #oldMovement)
+
+-- Remove cached original spawner
+getgenv().VynixuEntitySpawnerV2 = nil
+
+local loader, loadError = loadstring(source)
+
+if not loader then
+    error("[VELOCITY] Spawner compilation failed: " .. tostring(loadError))
+end
+
+local Spawner = loader()
+
+if not Spawner then
+    error("[VELOCITY] Spawner failed to load!")
+end
+
+--==================================================
+-- CREATE VELOCITY
+--==================================================
+
+local entity = Spawner:Create({
+
+    Entity = {
+        Name = ENTITY_NAME,
+        Asset = ASSET,
+        HeightOffset = 0
+    },
+
+    Movement = {
+        Speed = START_SPEED,
+        Delay = 2,
+        Reversed = false
+    },
+
+    Damage = {
+        Enabled = true,
+        Range = 40,
+        Amount = 125
+    },
+
+    Rebounding = {
+        Enabled = true,
+        Type = "Ambush",
+        Min = 1,
+        Max = 1,
+        Delay = 2
+    },
+
+    Lights = {
+        Flicker = {
+            Enabled = false,
+            Duration = 1
+        },
+
+        Shatter = false,
+        Repair = true
+    },
+
+    Earthquake = {
+        Enabled = false
+    },
+
+    CameraShake = {
+        Enabled = true,
+        Values = {1.5, 20, 0.1, 1},
+        Range = 100
+    },
+
+    Crucifixion = {
+        Type = "Guiding",
+        Enabled = true,
+        Range = 40,
+        Resist = false,
+        Break = true
+    },
+
+    Death = {
+        Type = "Guiding",
+
+        Hints = {
+            "You died to 'Velocity'.",
+            "Be ready when you start hearing a heartbeat.",
+            "He gains 5 speed every second.",
+            "He rebounds once.",
+            "Just hide in a closet.",
+            "See you later..."
+        },
+
+        Cause = "Velocity"
+    }
+})
+
+if not entity then
+    error("[VELOCITY] Entity creation failed!")
+end
+
+--==================================================
+-- MODEL SETUP
+--==================================================
+
+local model = entity.Model
+
+-- Exclusive identification
+model:SetAttribute("VelocityDynamicEnabled", true)
+model:SetAttribute("VelocityEntityKey", VELOCITY_KEY)
+
+-- Initial dynamic speed
+model:SetAttribute("VelocityDynamicSpeed", START_SPEED)
+
+--==================================================
+-- ROTATION: VERITYCRACKSYOU
+--==================================================
+
+local RunService = game:GetService("RunService")
+
+entity:SetCallback("OnSpawned", function()
+
+    local rotatingPart =
+        model:FindFirstChild("VerityCracksYou", true)
+
+    if not rotatingPart then
+        warn("[VELOCITY] VerityCracksYou not found!")
+        return
+    end
+
+    task.spawn(function()
+
+        local rotationSpeed = math.rad(100)
+
+        while model.Parent and rotatingPart.Parent do
+
+            local dt = RunService.Heartbeat:Wait()
+
+            rotatingPart:PivotTo(
+                rotatingPart:GetPivot()
+                * CFrame.Angles(0, rotationSpeed * dt, 0)
+            )
+
+        end
+
+    end)
+
+end)
+
+--==================================================
+-- DYNAMIC SPEED
+--==================================================
+
+entity:SetCallback("OnStartMoving", function()
+
+    task.spawn(function()
+
+        while model.Parent
+            and model:GetAttribute("Running")
+            and model:GetAttribute("VelocityEntityKey") == VELOCITY_KEY do
+
+            task.wait(SPEED_INTERVAL)
+
+            if not model.Parent
+                or not model:GetAttribute("Running") then
+                break
+            end
+
+            local currentSpeed =
+                model:GetAttribute("VelocityDynamicSpeed") or START_SPEED
+
+            model:SetAttribute(
+                "VelocityDynamicSpeed",
+                currentSpeed + SPEED_INCREMENT
+            )
+
+        end
+
+    end)
+
+end)
+
+--==================================================
+-- RUN
+--==================================================
+
+entity:Run(true)
